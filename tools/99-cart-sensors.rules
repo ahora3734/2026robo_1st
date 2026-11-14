@@ -1,0 +1,17 @@
+# /etc/udev/rules.d/99-cart-sensors.rules
+# 시각장애인용 자율주행 카트 USB 디바이스 포트 고정 규칙
+# 적용 방법:
+# sudo cp 99-cart-sensors.rules /etc/udev/rules.d/
+# sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# 1. ESP32 모터 제어 보드 (예: CP2102 / CH340)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0666", SYMLINK+="ttyCartESP32"
+
+# 2. WT901 IMU 센서 (CH340 USB-UART)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0666", SYMLINK+="ttyCartIMU"
+
+# 3. ZED-F9P 고정밀 GPS 모듈 (u-blox GNSS)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1546", ATTRS{idProduct}=="01a9", MODE="0666", SYMLINK+="ttyCartGPS"
+
+# 4. D500 (STL-19P) 2D 라이다 센서
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", ATTRS{serial}=="*LIDAR*", MODE="0666", SYMLINK+="ttyCartLiDAR"
