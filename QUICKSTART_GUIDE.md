@@ -10,10 +10,10 @@
 2026_ROBO_1/
 ├── BLUEPRINT.md                        # 전체 하드웨어/소프트웨어 상세 작업설계도
 ├── esp32_firmware/
-│   └── esp32_mecanum_controller/      # ESP32 메카넘 역기구학 & Cytron MD30C 펌웨어 (.ino)
-├── tools/                              # [1단계 & 2단계] 부품별 단품 점검 도구
+│   └── esp32_mecanum_controller/      # ESP32 메카넘 역기구학 & Cytron MD30C 펌웨어 (micro-ROS)
+├── tools/                              # [1단계] 부품별 단품 점검 도구
 │   ├── check_all_devices.py            # 하드웨어 종합 연결 & udev 상태 진단기
-│   ├── test_motor_esp32.py             # W,A,S,D 무선키보드 모터 구동 & 엔코더 테스트
+│   ├── test_motor_esp32.py             # (구버전 시리얼 테스트용 — 현재 micro-ROS 펌웨어에서는 미사용)
 │   ├── test_lidar.py                   # D500 LiDAR 360도 거리 데이터 수신 테스트
 │   ├── test_gps.py                     # ZED-F9P GNSS 위도/경도/RTK 상태 테스트
 │   ├── test_camera.py                  # C920 웹캠 실시간 영상 스트림 테스트
@@ -46,21 +46,31 @@ python3 tools/test_imu.py        # WT901 9축 IMU 자세(Roll, Pitch, Yaw) 확�
 
 ---
 
-### 2️⃣ [2단계] 무선 키보드 수동 주행 테스트 (CLI 모드)
+### 2️⃣ [2단계] micro-ROS 연결 및 키보드 수동 주행 테스트
 
-ESP32에 [esp32_mecanum_controller.ino](file:///c:/Users/포항고/Desktop/2026_ROBO_1/esp32_firmware/esp32_mecanum_controller/esp32_mecanum_controller.ino) 펌웨어를 업로드한 후 실행합니다.
+ESP32에 [esp32_mecanum_controller.ino](file:///home/pogo/2026_ROBO_1/esp32_firmware/esp32_mecanum_controller/esp32_mecanum_controller.ino) 펌웨어를 업로드한 뒤, Jetson에서 **두 개의 터미널**로 테스트합니다. *(기존 `tools/test_motor_esp32.py`는 구버전 시리얼 프로토콜용이므로 micro-ROS 펌웨어에서는 사용하지 않습니다.)*
 
-```bash
-python3 tools/test_motor_esp32.py
-```
+1. **터미널 1 — micro-ROS Agent 실행 (USB 통신 다리 연결)**:
+   ```bash
+   ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyUSB0 -b 115200
+   ```
+   - 연결되면 ESP32 내장 LED(`GPIO2`)가 깜빡임에서 **상시 점등**으로 바뀝니다.
+   - 토픽 수신 확인: `ros2 topic list` 실행 시 `/cmd_vel`, `/wheel/odom`, `/ultrasonic/front`, `/ultrasonic/down`, `/ultrasonic/left`, `/ultrasonic/right`가 보여야 합니다.
 
-* **조작 키 안내**:
-  * `W` : 전진 (+Vx)
-  * `S` : 후진 (-Vx)
-  * `A` : 좌측 게걸음 (+Vy)
-  * `D` : 우측 게걸음 (-Vy)
-  * `Q` / `E` : 좌회전 / 우회전 ($\pm\omega_z$)
-  * `SPACE` : **즉각 긴급 정지 (E-STOP)**
+2. **터미널 2 — `/cmd_vel` 발행으로 모터 구동 테스트**:
+   - **단발 주행 테스트** (바퀴를 바닥에서 띄운 상태에서 방향 확인):
+     ```bash
+     ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.2, y: 0.0, z: 0.0}, angular: {z: 0.0}}"
+     ```
+   - **키보드 수동 조종 (`wsadqe`)**: `/cmd_vel`을 발행하는 키보드 노드(예: `teleop_twist_keyboard` 또는 `wsadqe` 노드)를 실행하면 `W/S/A/D/Q/E` 입력에 따라 즉시 주행합니다. (Nav2 역시 동일한 `/cmd_vel` 토픽으로 주행 명령을 보냅니다.)
+
+* **조작 키 기준 (`wsadqe` / `/cmd_vel` 매핑)**:
+  * `W` : 전진 (`+linear.x`)
+  * `S` : 후진 (`-linear.x`)
+  * `A` : 좌측 게걸음 (`+linear.y`)
+  * `D` : 우측 게걸음 (`-linear.y`)
+  * `Q` / `E` : 좌회전 / 우회전 (`+angular.z` / `-angular.z`)
+  * `SPACE` : **즉각 정지 (속도 0 발행; 명령 0.5초 미수신 시 ESP32 Watchdog도 자동 정지)**
 
 ---
 
